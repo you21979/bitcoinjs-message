@@ -1,30 +1,42 @@
-const bs58check = require('bs58check')
-const bech32 = require('bech32')
-const bufferEquals = require('buffer-equals')
-const createHash = require('create-hash')
-const secp256k1 = require('secp256k1')
-const varuint = require('varuint-bitcoin')
+const bs58check = require('bs58check') as any;
+const bech32 = require('bech32') as any;
+const bufferEquals = require('buffer-equals') as any;
+const createHash = require('create-hash') as any;
+const secp256k1 = require('secp256k1') as any;
+import * as varuint from 'varuint-bitcoin'
 
 const SEGWIT_TYPES = {
   P2WPKH: 'p2wpkh',
   P2SH_P2WPKH: 'p2sh(p2wpkh)'
 }
 
-function sha256 (b) {
+interface DecodeSignatureInterface{
+  compressed: boolean;
+  segwitType: string | null;
+  recovery: number;
+  signature: Buffer;
+}
+
+interface SigOptionsInterface {
+  segwitType: string;
+  extraEntropy: Buffer;
+}
+
+function sha256 (b: Buffer): Buffer {
   return createHash('sha256')
     .update(b)
     .digest()
 }
-function hash256 (buffer) {
+function hash256 (buffer: Buffer): Buffer {
   return sha256(sha256(buffer))
 }
-function hash160 (buffer) {
+function hash160 (buffer: Buffer): Buffer {
   return createHash('ripemd160')
     .update(sha256(buffer))
     .digest()
 }
 
-function encodeSignature (signature, recovery, compressed, segwitType) {
+function encodeSignature (signature: Buffer, recovery: number, compressed: boolean, segwitType?: string): Buffer {
   if (segwitType !== undefined) {
     recovery += 8
     if (segwitType === SEGWIT_TYPES.P2WPKH) recovery += 4
@@ -34,7 +46,7 @@ function encodeSignature (signature, recovery, compressed, segwitType) {
   return Buffer.concat([Buffer.alloc(1, recovery + 27), signature])
 }
 
-function decodeSignature (buffer) {
+function decodeSignature (buffer: Buffer): DecodeSignatureInterface {
   if (buffer.length !== 65) throw new Error('Invalid signature length')
 
   const flagByte = buffer.readUInt8(0) - 27
@@ -54,7 +66,7 @@ function decodeSignature (buffer) {
   }
 }
 
-function magicHash (message, messagePrefix) {
+function magicHash (message: string, messagePrefix?: string| Buffer): Buffer {
   messagePrefix = messagePrefix || '\u0018Bitcoin Signed Message:\n'
   if (!Buffer.isBuffer(messagePrefix)) {
     messagePrefix = Buffer.from(messagePrefix, 'utf8')
@@ -71,12 +83,12 @@ function magicHash (message, messagePrefix) {
 }
 
 function sign (
-  message,
-  privateKey,
-  compressed,
-  messagePrefix,
-  sigOptions
-) {
+  message: string,
+  privateKey: string,
+  compressed: boolean,
+  messagePrefix?: any,
+  sigOptions?: SigOptionsInterface,
+): Buffer {
   if (typeof messagePrefix === 'object' && sigOptions === undefined) {
     sigOptions = messagePrefix
     messagePrefix = undefined
@@ -84,7 +96,7 @@ function sign (
   let { segwitType, extraEntropy } = sigOptions || {}
   if (
     segwitType &&
-    (typeof segwitType === 'string' || segwitType instanceof String)
+    (typeof segwitType === 'string' || (segwitType as any) instanceof String)
   ) {
     segwitType = segwitType.toLowerCase()
   }
@@ -111,7 +123,7 @@ function sign (
   )
 }
 
-function verify (message, address, signature, messagePrefix) {
+function verify (message: string, address: string, signature: string | Buffer, messagePrefix: string): boolean {
   if (!Buffer.isBuffer(signature)) signature = Buffer.from(signature, 'base64')
 
   const parsed = decodeSignature(signature)
@@ -148,8 +160,9 @@ function verify (message, address, signature, messagePrefix) {
   return bufferEquals(actual, expected)
 }
 
-module.exports = {
-  magicHash: magicHash,
-  sign: sign,
-  verify: verify
+export {
+  magicHash,
+  sign,
+  verify,
+  SigOptionsInterface
 }
